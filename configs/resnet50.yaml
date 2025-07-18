@@ -1,0 +1,17 @@
+backbone:
+  # [number, module, args]
+  [
+    [1, Conv, [3, 64, 7, 2]],             # [c_in, c_out, k, s]
+    [1, MaxPool, [False, 3, 2]],             # [c_in, k, s]
+    [1, ResNetLayer, [64, 64, 3, False]], # [c_in, c_hidden, n_blocks, downsample]
+    [1, ResNetLayer, [256, 128, 4, True]],
+    [1, ResNetLayer, [512, 256, 6, True]],
+    [1, ResNetLayer, [1024, 512, 3, True]],
+  ]
+
+head:
+  [
+    [1, AvgPool, [True]],
+    [1, Flatten, [1]],
+    [1, Linear, [2048, 560]]  # n_cls
+  ]
