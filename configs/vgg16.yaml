@@ -1,0 +1,29 @@
+# Author: Leon Miao
+# Module (backbone, head): [n_repeat, module_name, *args]
+  # Conv: [c_in, c_out, k, s, act, bias]
+  # Linear: [c_in, c_out, act, bias]
+  # Pool: [glb, k, s]
+  # ResNetLayer: [c_in, c_hidden, n_blocks, downsample]
+  # VggBlock: [c_in, c_out, n_layers, k, s]
+backbone:
+  # [n_repeat, module_name, args]
+  [
+    [1, VggBlock, [3, 64, 2, 3, 1]],
+    [1, MaxPool, [False, 2, 2]],
+    [1, VggBlock, [64, 128, 2, 3, 1]],
+    [1, MaxPool, [False, 2, 2]],
+    [1, VggBlock, [128, 256, 3, 3, 1]],
+    [1, MaxPool, [False, 2, 2]],
+    [1, VggBlock, [256, 512, 3, 3, 1]],
+    [1, MaxPool, [False, 2, 2]],
+    [1, VggBlock, [512, 512, 3, 3, 1]],
+    [1, MaxPool, [False, 2, 2]],
+  ]
+
+head:
+  [
+    [1, Flatten, [1]],
+    [1, Linear, [25088, 4096, True, True]],  # 512 * 7 * 7 = 25088
+    [1, Linear, [4096, 4096, True, True]],
+    [1, Linear, [4096, 1000, False, True]],
+  ]

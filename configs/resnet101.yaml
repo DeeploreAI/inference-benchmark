@@ -11,7 +11,7 @@ backbone:
     [1, MaxPool, [False, 3, 2]],
     [1, ResNetLayer, [64, 64, 3, False]],
     [1, ResNetLayer, [256, 128, 4, True]],
-    [1, ResNetLayer, [512, 256, 6, True]],
+    [1, ResNetLayer, [512, 256, 23, True]],
     [1, ResNetLayer, [1024, 512, 3, True]],
   ]
 head:

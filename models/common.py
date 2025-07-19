@@ -5,58 +5,55 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# All potential activation func list
-# TODO: inplace=True
-ACTIVATE = [nn.ReLU(), nn.SiLU(), nn.LeakyReLU()]
-
-
-def same_shape_pad(k: int, d: int = 1):  # TODO: what about the stride
+def auto_pad(k: int, s: int = 1, d: int = 1):
     """
-    Calculates the padding size of a conv layer to maintain the input shape.
+    Automatically padding.
+    output = floor((input + 2 * p - k) / s) + 1
     :param k: kernel size
-    :param d: dilation size
-    :return: padding size
+    :param s: stride
+    :param d: dilation
     """
-    k = d * (k - 1) + 1 if d > 1 else k
-    p = k // 2  # floor div
-    return p
+    k_effe = d * (k - 1) + 1  # effective kernel size, considering dilation
+    if k_effe % 2 == 1:  # odd kernel size
+        return (k_effe - s + 1) // 2
+    else:  # even kernel size
+        return (k_effe - s) // 2
 
 
 class Linear(nn.Module):
-    """Linear / Fully-connected layer."""
+    """Linear / Fully-connected layer. No batch norm."""
 
-    def __init__(self, c_in: int, c_out: int, bias: bool = True):
+    def __init__(self, c_in: int, c_out: int, act: bool=True, bias: bool=False):
         super().__init__()
         self.linear = nn.Linear(c_in, c_out, bias=bias)
+        self.act = ReLU() if act else nn.Identity()
 
     def forward(self, x):
-        return self.linear(x)
+        return self.act(self.linear(x))
 
 
 class Conv(nn.Module):
-    """2D convolution layer, with batch norm and activation."""
+    """2D convolution layer, with batch norm."""
 
-    def __init__(self, c_in, c_out, k=1, s=1, p=None, d=1, bias=False):
+    def __init__(self, c_in, c_out, k=1, s=1, act: bool=True, bias: bool=False):
         """
         Initializes the 2D convolution layer.
         :param c_in: input channels
         :param c_out: output channels
         :param k: kernel size
-        :param p: padding, if p is None, pad to the same size by default
         :param s: stride
-        :param d: dilation size
         """
         super().__init__()
-        p = same_shape_pad(k, d) if p is None else p
-        self.conv = nn.Conv2d(c_in, c_out, k, s, p, dilation=d, bias=bias)
+        p = auto_pad(k, s)  # 传递stride参数
+        self.conv = nn.Conv2d(c_in, c_out, k, s, p, bias=bias)
         self.bn = nn.BatchNorm2d(c_out)
-        self.activate = ACTIVATE[0]  # TODO: optimize the activation func.
+        self.act = ReLU() if act else nn.Identity()  # TODO: optimize the activation func.
 
     def forward(self, x):
         """
         [B, C_in, H_in, W_in] -> [B, C_out, H_out, W_out].
         """
-        return self.activate(self.bn(self.conv(x)))
+        return self.act(self.bn(self.conv(x)))
 
 
 class Bottleneck(nn.Module):
@@ -74,27 +71,22 @@ class Bottleneck(nn.Module):
         c_out = c_hidden * expansion
         self.conv_1 = Conv(c_in, c_hidden, k=1, s=1)
         self.conv_2 = Conv(c_hidden, c_hidden, k=3, s=s)
-        self.conv_3 = Conv(c_hidden, c_out, k=1, s=1)
-        self.bn_hidden = nn.BatchNorm2d(c_hidden)
-        self.bn = nn.BatchNorm2d(c_out)
-        self.activate = ACTIVATE[0]
+        self.conv_3 = Conv(c_hidden, c_out, k=1, s=1, act=False)
+        self.act = ReLU()
 
         # Shortcut connection / skip connection
         if c_in == c_out and s == 1:  # input and output with same spatial size and feature dim
             self.shortcut = nn.Identity()  # no BN for identity
         else:
-            self.shortcut = nn.Sequential(Conv(c_in, c_out, k=1, s=s), self.bn) # TODO: check
+            self.shortcut = Conv(c_in, c_out, k=1, s=s, act=False)
 
     def forward(self, x):
-        """
-        [B, C_in, H_in, W_in] -> [B, C_out, H_out, W_out].
-        """
         x_id = x  # identity of x, for shortcut connection
-        x_out = self.activate(self.bn_hidden(self.conv_1(x)))
-        x_out = self.activate(self.bn_hidden(self.conv_2(x_out)))
-        x_out = self.bn(self.conv_3(x_out))
-        x_shortcut = self.shortcut(x_id)
-        x_out = self.activate(x_out + x_shortcut)
+        x_out = self.conv_1(x)  # conv, bn, relu
+        x_out = self.conv_2(x_out)  # conv, bn, relu
+        x_out = self.conv_3(x_out)  # conv, bn
+        x_shortcut = self.shortcut(x_id)  # conv, bn / identity
+        x_out = self.act(x_out + x_shortcut)  # add, relu
         return x_out
 
 
@@ -113,36 +105,60 @@ class ResNetLayer(nn.Module):
         super().__init__()
         c_out = c_hidden * expansion
 
-        # Handel the first bottleneck block
+        # Handle the first bottleneck block
+        resnet_layer = nn.ModuleList()
         if downsample:
-            blocks = [Bottleneck(c_in, c_hidden, s=2, expansion=expansion)]
+            resnet_layer.append(Bottleneck(c_in, c_hidden, s=2, expansion=expansion))
         else:
-            blocks = [Bottleneck(c_in, c_hidden, s=1, expansion=expansion)]
+            resnet_layer.append(Bottleneck(c_in, c_hidden, s=1, expansion=expansion))
 
-        # Handel the rest (n_blocks - 1)
-        blocks.extend([Bottleneck(c_out, c_hidden, s=1, expansion=expansion)] * (n_blocks - 1))
-        self.resnet_layer = nn.Sequential(*blocks)
+        # Handle the rest (n_blocks - 1)
+        resnet_layer.extend([Bottleneck(c_out, c_hidden, s=1, expansion=expansion) for _ in range(n_blocks - 1)])
+        self.resnet_layer = nn.Sequential(*resnet_layer)
 
     def forward(self, x):
         return self.resnet_layer(x)
 
 
+class VggBlock(nn.Module):
+    """Standard VGG block."""
+
+    def __init__(self, c_in, c_out, n_layers, k=3, s=1):
+        """
+        Initializes the VGG block.
+        :param c_in: input channels
+        :param c_out: output channels
+        :param n_layers: number of conv layers in a Vgg block
+        :param k: kernel size
+        :param s: stride
+        """
+        super().__init__()
+        # Handle the first layer
+        vgg_block = nn.ModuleList([Conv(c_in, c_out, k=k, s=s)])
+
+        # Handle the rest layers
+        vgg_block.extend([Conv(c_out, c_out, k=k, s=s) for _ in range(n_layers - 1)])
+        self.vgg_block = nn.Sequential(*vgg_block)
+
+    def forward(self, x):
+        return self.vgg_block(x)
+
+
 class AvgPool(nn.Module):
     """Average pooling layer, global pooling or given kernel and stride."""
 
-    def __init__(self, glb: bool=True, k=None, s=None, p=None):
+    def __init__(self, glb: bool=True, k=None, s=None):
         """
         Initialize the average pooling layer.
         :param glb: global pooling or local pooling
         :param k: kernel size (optional, only when glb is False)
         :param s: stride (optional, only when glb is False)
-        :param p: padding (optional, only when glb is False, if None, use same shape padding size)
         """
         super().__init__()
         if glb:
             self.pool = nn.AdaptiveAvgPool2d((1, 1))
         else:
-            p = same_shape_pad(k) if p is None else p
+            p = auto_pad(k, s)  # 传递stride参数，现在会根据kernel和stride智能计算
             self.pool = nn.AvgPool2d(kernel_size=k, stride=s, padding=p)
 
     def forward(self, x):
@@ -152,19 +168,18 @@ class AvgPool(nn.Module):
 class MaxPool(nn.Module):
     """Max pooling layer, global pooling or given kernel and stride."""
 
-    def __init__(self, glb: bool=True, k=None, s=None, p=None):
+    def __init__(self, glb: bool=True, k=None, s=None):
         """
         Initialize the max pooling layer.
         :param glb: global pooling or local pooling
         :param k: kernel size (optional, only when glb is False)
         :param s: stride (optional, only when glb is False)
-        :param p: padding (optional, only when glb is False, if None, use same shape padding size)
         """
         super().__init__()
         if glb:
             self.pool = nn.AdaptiveMaxPool2d((1, 1))
         else:
-            p = same_shape_pad(k) if p is None else p
+            p = auto_pad(k, s)  # 传递stride参数，现在会根据kernel和stride智能计算
             self.pool = nn.MaxPool2d(kernel_size=k, stride=s, padding=p)
 
     def forward(self, x):
@@ -197,6 +212,7 @@ class Flatten(nn.Module):
     def forward(self, x):
         return self.flatten(x)
 
+
 class Concat(nn.Module):
     """Concatenates a list of tensors along a given dimension."""
 
@@ -206,3 +222,27 @@ class Concat(nn.Module):
 
     def forward(self, x: List[torch.Tensor]) -> torch.Tensor:
         return torch.cat(x, self.dim)
+
+
+class ReLU(nn.Module):
+    def __init__(self, inplace=False):
+        super().__init__()
+        self.relu = nn.ReLU(inplace=inplace)
+    def forward(self, x):
+        return self.relu(x)
+
+
+class SiLU(nn.Module):
+    def __init__(self, inplace=False):
+        super().__init__()
+        self.silu = nn.SiLU(inplace=inplace)
+    def forward(self, x):
+        return self.silu(x)
+
+
+class LeakyReLU(nn.Module):
+    def __init__(self, inplace=False):
+        super().__init__()
+        self.leaky = nn.LeakyReLU(inplace=inplace)
+    def forward(self, x):
+        return self.leaky(x)
