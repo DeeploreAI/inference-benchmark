@@ -48,8 +48,14 @@ Estimated Total Size (MB): 662.49
 ===============================================================================================
 Device: GPU
 Framework: PyTorch
-avg_time_ms: 1.78
-min_time_ms: 1.71
-max_time_ms: 1.99
-std_time_ms: 0.10
-fps: 562.16
+============================================================
+Classification Test
+pred_class: stingray
+confidence: 0.38524845242500305
+============================================================
+Inference Time Test
+avg_time_ms: 1.7438
+min_time_ms: 1.7056
+max_time_ms: 2.0070
+std_time_ms: 0.0784
+fps: 573.4734

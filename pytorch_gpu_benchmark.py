@@ -9,7 +9,6 @@ import numpy as np
 from PIL import Image
 import torch
 import torch.nn as nn
-from fsspec.compression import unzip
 from torchinfo import summary
 import torchvision.transforms as transforms
 import torchvision.models as models
@@ -65,8 +64,6 @@ def image_preprocess(image_path):
 
 
 def gpu_inference_time_test(model, input_tensor, num_warmup_iters=10, num_iters=100):
-    print("=== GPU Inference Time Test ===")
-
     # Set to evaluation mode
     model.eval()
     
@@ -99,7 +96,7 @@ def gpu_inference_time_test(model, input_tensor, num_warmup_iters=10, num_iters=
     max_time = np.max(inference_times)
     std_time = np.std(inference_times)
     
-    print(f"\n=== Inference Time Statistics ===")
+    print(f"\n=== GPU PyTorch Inference Time ===")
     print(f"Avg: {avg_time:.2f} ms")
     print(f"Min: {min_time:.2f} ms")
     print(f"Max: {max_time:.2f} ms")
@@ -120,8 +117,6 @@ def imagenet_classify_test(model, input_tensor, imagenet_classes_name):
     Test image classification using ImageNet pretrained weights.
     Tests all four models: resnet50, resnet101, vgg16, vgg19.
     """
-    print("=== ImageNet Classification Test ===")
-
     # Set to evaluation mode
     model.eval()
 
@@ -149,8 +144,15 @@ def imagenet_classify_test(model, input_tensor, imagenet_classes_name):
         top1_idx = top5_indices[0, 0].item()
         top1_prob = top5_prob[0, 0].item()
         top1_class = imagenet_classes_name[top1_idx]
-        print(f"\n🎯 Top Prediction: {top1_class}")
-        print(f"   Confidence: {top1_prob:.4f} ({top1_prob * 100:.2f}%)")
+
+        print(f"\n=== ImageNet Classification ===")
+        print(f"\n🎯 Predicted Class: {top1_class}")
+        print(f"   Confidence: {top1_prob:.4f}")
+
+        return {
+            "pred_class": top1_class,
+            "confidence": top1_prob,
+        }
 
 
 def main():
@@ -193,8 +195,14 @@ def main():
             f.write("\n")
             f.write("Device: GPU\n")
             f.write("Framework: PyTorch\n")
+            f.write("="*60)
+            f.write("\nClassification Test\n")
+            for key, value in classify_results.items():
+                f.write(f"{key}: {value}\n")
+            f.write("=" * 60)
+            f.write("\nInference Time Test\n")
             for key, value in time_test_results.items():
-                f.write(f"{key}: {value:.2f}\n")
+                f.write(f"{key}: {value:.4f}\n")
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@
   &quot;keyToString&quot;: {
     &quot;Python.benchmark_test.executor&quot;: &quot;Run&quot;,
     &quot;Python.load_pretrained_models.executor&quot;: &quot;Run&quot;,
-    &quot;Python.pytorch_gpu_benchmark.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.pytorch_gpu_benchmark.executor&quot;: &quot;Run&quot;,
     &quot;Python.test_auto_pad.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
@@ -150,7 +150,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1752751459907</updated>
-      <workItem from="1752751460947" duration="66854000" />
+      <workItem from="1752751460947" duration="68608000" />
     </task>
     <servers />
   </component>
@@ -159,7 +159,7 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/npu_efficiency_benchmark$load_pretrained_models.coverage" NAME="load_pretrained_models Coverage Results" MODIFIED="1752941680370" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/npu_efficiency_benchmark$pytorch_gpu_benchmark.coverage" NAME="pytorch_gpu_benchmark Coverage Results" MODIFIED="1752987951666" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/npu_efficiency_benchmark$pytorch_gpu_benchmark.coverage" NAME="pytorch_gpu_benchmark Coverage Results" MODIFIED="1752999302673" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/npu_efficiency_benchmark$benchmark_test.coverage" NAME="benchmark_test Coverage Results" MODIFIED="1752936892127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/npu_efficiency_benchmark$test_auto_pad.coverage" NAME="test_auto_pad Coverage Results" MODIFIED="1752927181049" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
