@@ -1,10 +1,12 @@
-# Ignore pretrained model weights
+# Ignore pretrained model weights, exported onnx model
 pretrained/
+onnx/
 
 # Ignore other model files
 *.pth
 *.pt
 *.weights
+*.onnx
 
 # Ignore Python cache
 __pycache__/

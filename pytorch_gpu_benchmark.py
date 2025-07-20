@@ -171,7 +171,7 @@ def main():
     # Models
     model_names_list = ["resnet50", "resnet101", "vgg16", "vgg19"]
     for model_name in model_names_list:
-        print(f"\n=== Testing {model_name.upper()} ===")
+        print(f"\n=== Testing {model_name} ===")
         model_cfg_path = os.path.join("configs", f"{model_name}.yaml")
         with open(model_cfg_path, 'r', encoding='utf-8') as f:
             model_cfg = yaml.safe_load(f)
@@ -194,7 +194,7 @@ def main():
         with open(f"results/{model_name}_report.txt", "w") as f:
             f.write(str(model_summary))
             f.write("\n")
-            f.write("Device: GPU\n")
+            f.write("Device: GPU (RTX-4090)\n")
             f.write("Framework: PyTorch\n")
             f.write("="*60)
             f.write("\nClassification Test\n")
