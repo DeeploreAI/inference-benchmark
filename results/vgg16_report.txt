@@ -4,23 +4,23 @@ Layer (type:depth-idx)                        Output Shape              Param #
 Model                                         [1, 1000]                 --
 ├─Sequential: 1-1                             [1, 512, 7, 7]            --
 │    └─VggBlock: 2-1                          [1, 64, 224, 224]         --
-│    │    └─Sequential: 3-1                   [1, 64, 224, 224]         38,848
+│    │    └─Sequential: 3-1                   [1, 64, 224, 224]         38,720
 │    └─MaxPool: 2-2                           [1, 64, 112, 112]         --
 │    │    └─MaxPool2d: 3-2                    [1, 64, 112, 112]         --
 │    └─VggBlock: 2-3                          [1, 128, 112, 112]        --
-│    │    └─Sequential: 3-3                   [1, 128, 112, 112]        221,696
+│    │    └─Sequential: 3-3                   [1, 128, 112, 112]        221,440
 │    └─MaxPool: 2-4                           [1, 128, 56, 56]          --
 │    │    └─MaxPool2d: 3-4                    [1, 128, 56, 56]          --
 │    └─VggBlock: 2-5                          [1, 256, 56, 56]          --
-│    │    └─Sequential: 3-5                   [1, 256, 56, 56]          1,476,096
+│    │    └─Sequential: 3-5                   [1, 256, 56, 56]          1,475,328
 │    └─MaxPool: 2-6                           [1, 256, 28, 28]          --
 │    │    └─MaxPool2d: 3-6                    [1, 256, 28, 28]          --
 │    └─VggBlock: 2-7                          [1, 512, 28, 28]          --
-│    │    └─Sequential: 3-7                   [1, 512, 28, 28]          5,901,312
+│    │    └─Sequential: 3-7                   [1, 512, 28, 28]          5,899,776
 │    └─MaxPool: 2-8                           [1, 512, 14, 14]          --
 │    │    └─MaxPool2d: 3-8                    [1, 512, 14, 14]          --
 │    └─VggBlock: 2-9                          [1, 512, 14, 14]          --
-│    │    └─Sequential: 3-9                   [1, 512, 14, 14]          7,080,960
+│    │    └─Sequential: 3-9                   [1, 512, 14, 14]          7,079,424
 │    └─MaxPool: 2-10                          [1, 512, 7, 7]            --
 │    │    └─MaxPool2d: 3-10                   [1, 512, 7, 7]            --
 ├─Sequential: 1-2                             [1, 1000]                 --
@@ -36,20 +36,20 @@ Model                                         [1, 1000]                 --
 │    │    └─Linear: 3-16                      [1, 1000]                 4,097,000
 │    │    └─Identity: 3-17                    [1, 1000]                 --
 ===============================================================================================
-Total params: 138,361,768
-Trainable params: 138,361,768
+Total params: 138,357,544
+Trainable params: 138,357,544
 Non-trainable params: 0
-Total mult-adds (G): 15.47
+Total mult-adds (G): 15.48
 ===============================================================================================
 Input size (MB): 0.60
-Forward/backward pass size (MB): 216.83
-Params size (MB): 553.45
-Estimated Total Size (MB): 770.88
+Forward/backward pass size (MB): 108.45
+Params size (MB): 553.43
+Estimated Total Size (MB): 662.49
 ===============================================================================================
 Device: GPU
 Framework: PyTorch
-avg_time_ms: 1.75
-min_time_ms: 1.73
-max_time_ms: 2.03
-std_time_ms: 0.05
-fps: 571.34
+avg_time_ms: 1.78
+min_time_ms: 1.71
+max_time_ms: 1.99
+std_time_ms: 0.10
+fps: 562.16

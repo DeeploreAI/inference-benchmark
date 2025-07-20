@@ -9,6 +9,7 @@ from models.common import *
 MODULE_MAP = {
     'Linear': Linear,
     'Conv': Conv,
+    'ConvBN': ConvBN,
     'Bottleneck': Bottleneck,
     'ResNetLayer': ResNetLayer,
     'VggBlock': VggBlock,

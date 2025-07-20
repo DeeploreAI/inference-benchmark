@@ -1,3 +1,4 @@
+from tkinter.ttk import Treeview
 from typing import List
 
 import torch
@@ -33,7 +34,7 @@ class Linear(nn.Module):
 
 
 class Conv(nn.Module):
-    """2D convolution layer, with batch norm."""
+    """2D convolution layer, without batch norm."""
 
     def __init__(self, c_in, c_out, k=1, s=1, act: bool=True, bias: bool=False):
         """
@@ -44,15 +45,25 @@ class Conv(nn.Module):
         :param s: stride
         """
         super().__init__()
-        p = auto_pad(k, s)  # 传递stride参数
+        p = auto_pad(k, s)
         self.conv = nn.Conv2d(c_in, c_out, k, s, p, bias=bias)
-        self.bn = nn.BatchNorm2d(c_out)
         self.act = ReLU() if act else nn.Identity()  # TODO: optimize the activation func.
 
     def forward(self, x):
-        """
-        [B, C_in, H_in, W_in] -> [B, C_out, H_out, W_out].
-        """
+        return self.act(self.conv(x))
+
+
+class ConvBN(nn.Module):
+    """2D convolution layer, with batch norm."""
+
+    def __init__(self, c_in, c_out, k=1, s=1, act: bool=True, bias: bool=False):
+        super().__init__()
+        p = auto_pad(k, s)
+        self.conv = nn.Conv2d(c_in, c_out, k, s, p, bias=bias)
+        self.bn = nn.BatchNorm2d(c_out)
+        self.act = ReLU() if act else nn.Identity()
+
+    def forward(self, x):
         return self.act(self.bn(self.conv(x)))
 
 
@@ -69,16 +80,16 @@ class Bottleneck(nn.Module):
         """
         super().__init__()
         c_out = c_hidden * expansion
-        self.conv_1 = Conv(c_in, c_hidden, k=1, s=1)
-        self.conv_2 = Conv(c_hidden, c_hidden, k=3, s=s)
-        self.conv_3 = Conv(c_hidden, c_out, k=1, s=1, act=False)
+        self.conv_1 = ConvBN(c_in, c_hidden, k=1, s=1)
+        self.conv_2 = ConvBN(c_hidden, c_hidden, k=3, s=s)
+        self.conv_3 = ConvBN(c_hidden, c_out, k=1, s=1, act=False)
         self.act = ReLU()
 
         # Shortcut connection / skip connection
         if c_in == c_out and s == 1:  # input and output with same spatial size and feature dim
             self.shortcut = nn.Identity()  # no BN for identity
         else:
-            self.shortcut = Conv(c_in, c_out, k=1, s=s, act=False)
+            self.shortcut = ConvBN(c_in, c_out, k=1, s=s, act=False)
 
     def forward(self, x):
         x_id = x  # identity of x, for shortcut connection
@@ -134,10 +145,10 @@ class VggBlock(nn.Module):
         """
         super().__init__()
         # Handle the first layer
-        vgg_block = nn.ModuleList([Conv(c_in, c_out, k=k, s=s)])
+        vgg_block = nn.ModuleList([Conv(c_in, c_out, k=k, s=s, bias=True)])
 
         # Handle the rest layers
-        vgg_block.extend([Conv(c_out, c_out, k=k, s=s) for _ in range(n_layers - 1)])
+        vgg_block.extend([Conv(c_out, c_out, k=k, s=s, bias=True) for _ in range(n_layers - 1)])
         self.vgg_block = nn.Sequential(*vgg_block)
 
     def forward(self, x):
@@ -158,7 +169,7 @@ class AvgPool(nn.Module):
         if glb:
             self.pool = nn.AdaptiveAvgPool2d((1, 1))
         else:
-            p = auto_pad(k, s)  # 传递stride参数，现在会根据kernel和stride智能计算
+            p = auto_pad(k, s)
             self.pool = nn.AvgPool2d(kernel_size=k, stride=s, padding=p)
 
     def forward(self, x):
@@ -179,7 +190,7 @@ class MaxPool(nn.Module):
         if glb:
             self.pool = nn.AdaptiveMaxPool2d((1, 1))
         else:
-            p = auto_pad(k, s)  # 传递stride参数，现在会根据kernel和stride智能计算
+            p = auto_pad(k, s)
             self.pool = nn.MaxPool2d(kernel_size=k, stride=s, padding=p)
 
     def forward(self, x):
@@ -225,7 +236,7 @@ class Concat(nn.Module):
 
 
 class ReLU(nn.Module):
-    def __init__(self, inplace=False):
+    def __init__(self, inplace=True):
         super().__init__()
         self.relu = nn.ReLU(inplace=inplace)
     def forward(self, x):
@@ -233,7 +244,7 @@ class ReLU(nn.Module):
 
 
 class SiLU(nn.Module):
-    def __init__(self, inplace=False):
+    def __init__(self, inplace=True):
         super().__init__()
         self.silu = nn.SiLU(inplace=inplace)
     def forward(self, x):
@@ -241,7 +252,7 @@ class SiLU(nn.Module):
 
 
 class LeakyReLU(nn.Module):
-    def __init__(self, inplace=False):
+    def __init__(self, inplace=True):
         super().__init__()
         self.leaky = nn.LeakyReLU(inplace=inplace)
     def forward(self, x):

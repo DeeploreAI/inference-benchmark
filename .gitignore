@@ -1,0 +1,18 @@
+# Ignore pretrained model weights
+pretrained/
+
+# Ignore other model files
+*.pth
+*.pt
+*.weights
+
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore IDE files
+.idea/
+
+# Other common ignores
+*.log
+*.tmp 

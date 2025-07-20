@@ -7,7 +7,7 @@
   # VggBlock: [c_in, c_out, n_layers, k, s]
 backbone:
   [
-    [1, Conv, [3, 64, 7, 2]],
+    [1, ConvBN, [3, 64, 7, 2]],
     [1, MaxPool, [False, 3, 2]],
     [1, ResNetLayer, [64, 64, 3, False]],
     [1, ResNetLayer, [256, 128, 4, True]],
