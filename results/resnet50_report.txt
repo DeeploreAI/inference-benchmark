@@ -44,8 +44,8 @@ pred_class: stingray
 confidence: 0.6577983498573303
 ============================================================
 Inference Time Test
-avg_time_ms: 1.4466
-min_time_ms: 1.4105
-max_time_ms: 1.7202
-std_time_ms: 0.0530
-fps: 691.2567
+avg_time_ms: 1.4299
+min_time_ms: 1.4009
+max_time_ms: 1.5602
+std_time_ms: 0.0243
+fps: 699.3467

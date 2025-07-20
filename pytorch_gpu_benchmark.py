@@ -15,6 +15,7 @@ import torchvision.models as models
 
 # Local lib
 from models.utils import Model
+from models.utils import set_deterministic
 
 
 def load_pretrained_weights(model, pretrained_weight_path):
@@ -206,4 +207,5 @@ def main():
 
 
 if __name__ == "__main__":
+    set_deterministic(random_seed=666)
     main()
