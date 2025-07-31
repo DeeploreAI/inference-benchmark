@@ -1,0 +1,44 @@
+# 深度学习模型训练时间计算器配置文件
+# 作者: Claude Code Assistant
+# 日期: 2025-07-31
+
+# 模型配置
+model:
+  model_name: "resnet50"                    # 可选: resnet50, resnet101, vgg16, vgg19
+  batch_size: 128                     # 批次大小
+  image_size: 640
+
+# CPU配置
+cpu:
+  cores: 32                           # CPU核心数
+  base_freq: 3.85                  # 基础频率(GHz)
+  max_freq: 4.3                    # 最大睿频(GHz)
+  l3_cache: 256                     # L3缓存大小(MB)
+
+# RAM配置
+ram:
+  num_rams: 4                          # 内存通道数量
+  ram_freq: 4800                  # 内存频率(MHz)
+
+# GPU配置
+gpu:
+  num_gpus: 2                         # GPU数量
+  vram: 48                         # 显存大小(GB，单GPU)
+  vram_bw: 1008.0       # 显存带宽(GB/s，单GPU，RTX4090)
+  fp32: 82.6                   # FP32算力(TFLOPS，单GPU，RTX4090)
+  pcie_gen: 4                         # PCIe版本 (3/4/5)
+  pcie_lanes: 16                      # PCIe通道数 per GPU
+  nvlink_version: null                # NVLink版本 (V2/V3/V4 或 null)
+
+# 存储配置
+storage:
+  ssd_read: 7.0                  # SSD读取速度(GB/s)
+  ssd_write: 6.5                 # SSD写入速度(GB/s)
+
+# 多GPU同步模式
+sync_mode: "RAM"                      # P2P, NVLink, RAM
+
+# 输出选项
+output:
+  report_file: null                   # 输出报告文件路径 (null表示控制台输出)
+  verbose: true                       # 显示详细信息
