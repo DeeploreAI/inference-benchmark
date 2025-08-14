@@ -1,0 +1,21 @@
+device:
+  num_devices: 1
+  num_workers: 8
+  pin_memory: True
+
+data:
+  root: "/home/ziliang/Projects/Marine Datasets/butterflyfishes_cls"
+  num_cls: 28
+  batch_size: 32
+  shuffle: True
+  augmentation: True
+
+train:
+  expt_name:
+  model_name: "resnet50"
+  pretrained: True
+  optimizer: "AdamW"
+  lr: 0.001
+  weight_decay: 0.05
+  epochs: 100
+  validate_epoch: 5

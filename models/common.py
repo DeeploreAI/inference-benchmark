@@ -1,4 +1,3 @@
-from tkinter.ttk import Treeview
 from typing import List
 
 import torch

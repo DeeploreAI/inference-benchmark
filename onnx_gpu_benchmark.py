@@ -143,10 +143,10 @@ def main():
         ort_session = onnxruntime.InferenceSession("onnx/%s.onnx" % model_name, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         ort_inputs = {'input': image_tensor.detach().numpy()}
 
-        # ONNX Runtime GPU inference time test
+        # ONNX Runtime GPU inference time server
         time_test_results = onnx_inference_time_test(ort_session, ort_inputs)
 
-        # ONNX GPU classification test
+        # ONNX GPU classification server
         classify_results = onnx_classify_test(ort_session, ort_inputs, imagenet_classes_name)
 
         # Save report

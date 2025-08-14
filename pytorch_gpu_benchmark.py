@@ -184,10 +184,10 @@ def main():
         # Model summary
         model_summary = summary(model, input_size=image_tensor.shape, depth=3, verbose=1)
         
-        # GPU Inference time test
+        # GPU Inference time server
         time_test_results = gpu_inference_time_test(model, image_tensor)
 
-        # Classification test
+        # Classification server
         classify_results = imagenet_classify_test(model, image_tensor, imagenet_classes_name)
 
         # Save report

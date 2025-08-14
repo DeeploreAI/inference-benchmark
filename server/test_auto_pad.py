@@ -25,7 +25,7 @@ class AutoPadTester:
             d: dilation
             
         Returns:
-            Dictionary containing test results
+            Dictionary containing server results
         """
         # Get padding from auto_pad function
         padding = auto_pad(k, s, d)
@@ -56,12 +56,12 @@ class AutoPadTester:
     
     def run_comprehensive_tests(self) -> bool:
         """
-        Run comprehensive test cases covering all scenarios
+        Run comprehensive server cases covering all scenarios
         
         Returns:
             True if all tests pass, False otherwise
         """
-        # Define test cases covering all branches
+        # Define server cases covering all branches
         test_cases = [
             # Stride=1 cases (same shape)
             (1, 1, 1, "1x1 pointwise convolution"),
@@ -154,7 +154,7 @@ class AutoPadTester:
             print()
     
     def get_failed_cases(self) -> List[Dict]:
-        """Return list of failed test cases for debugging"""
+        """Return list of failed server cases for debugging"""
         return [result for result in self.test_results if not result['passed']]
 
 

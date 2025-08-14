@@ -18,5 +18,5 @@ head:
   [
     [1, AvgPool, [True]],
     [1, Flatten, [1]],
-    [1, Linear, [2048, 1000, False, True]]
+    [1, Linear, [2048, 28, False, True]]
   ]

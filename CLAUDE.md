@@ -36,7 +36,7 @@ python pytorch_gpu_benchmark.py
 python onnx_gpu_benchmark.py
 
 # Run hardware performance analysis
-cd test/
+cd server/
 python server_compute_time.py --config server_config.yaml
 ```
 
