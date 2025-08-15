@@ -11,11 +11,11 @@ data:
   augmentation: True
 
 train:
-  expt_name: "butterflyfishes-resnet101-imagenet"
-  model_name: "resnet101"
-  pretrained: True
+  expt_name: "butterflyfishes-resnet50-epoch150"
+  model_name: "resnet50"
+  pretrained: # "imagenet1k_v1"
   optimizer: "AdamW"
   lr: 0.001
   weight_decay: 0.05
-  epochs: 200
+  epochs: 100
   validate_epoch: 5

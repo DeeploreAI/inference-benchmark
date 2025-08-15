@@ -62,19 +62,44 @@ def merge_yaml_with_args(config_path: str, args: argparse.Namespace) -> argparse
         return args
 
 
+def save_training_config(args, log_dir: Path):
+    if args.resume_version is not None:
+        # Resume training, check the resume config, then save current config.
+        resume_config_path = log_dir.parent / f"version_{args.resume_version}" / "config.yaml"
+        with open(resume_config_path, 'r') as f:
+            resume_config = yaml.safe_load(f)
+        args_dict = vars(args)
+        for k, resume_v in resume_config.items():
+            current_v = args_dict[k]
+            if resume_v != current_v:
+                print(f"Warning: the current and resume value of {k} are not match.")
+
+    # Save current training config.
+    config_file = log_dir / "config.yaml"
+    with open(config_file, 'w') as f:
+        yaml.dump(vars(args), f, default_flow_style=False)
+
+
 def setup_logging(args):
     if args.expt_name:
         expt_name = args.expt_name
     else:
         expt_name = f"{args.model_name}_{datetime.datetime.now().strftime('%m%d_%H%M')}"
-    if args.resume_version:
+
+    # Resume.
+    if args.resume_version is not None:
         # Resume training.
         log_dir = Path("./logs") / f"{expt_name}" / f"version_{args.resume_version + 1}"
     else:
         # First time training.
         log_dir = Path("./logs") / f"{expt_name}" / "version_0"
+
     os.makedirs(log_dir, exist_ok=True)
     logger = SummaryWriter(log_dir=log_dir)
+
+    # Save training config file.
+    save_training_config(args, log_dir)
+
     return logger, log_dir
 
 
@@ -110,44 +135,84 @@ def save_ckpt(model_state, ckpt_path: Path, is_best=False):
         shutil.copyfile(ckpt_path, ckpt_path.parent / "best.pth")
 
 
-def load_ckpt(ckpt_path: Path, model, optimizer = None):
+def load_ckpt(ckpt_path: Path, model, optimizer = None, scheduler = None):
     if not ckpt_path.exists():
         print(f"Checkpoint file {ckpt_path} not found!")
         return None, 0
 
-    checkpoint = torch.load(ckpt_path, map_location='cpu')
-    start_epoch = checkpoint.get('epoch', 0)
-    print(f"\nUse epoch {start_epoch} checkpoint from {ckpt_path}.\n")
+    ckpt_state = torch.load(ckpt_path, map_location='cpu')
+    start_epoch = ckpt_state.get('epoch', 0)
+    print(f"\nLoad epoch {start_epoch} ckpt_state from {ckpt_path}, val top1 accuracy: {ckpt_state['val_top1_acc']:.2f}%")
     
     # Load model state dict.
-    model.load_state_dict(checkpoint["model_state_dict"])
+    model.load_state_dict(ckpt_state["model_state_dict"])
     
-    # Load optimizer state if provided.
-    if optimizer and "optimizer_state_dict" in checkpoint:
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        return model, optimizer, start_epoch
-
+    # Load optimizer state and scheduler state if provided.
+    if (optimizer is not None) and (scheduler is not None):
+        try:
+            optimizer.load_state_dict(ckpt_state['optimizer_state_dict'])
+            scheduler.load_state_dict(ckpt_state['scheduler_state_dict'])
+        except KeyError:
+            print("Error: saved checkpoint state does not include optimizer state or scheduler state.")
+        return model, start_epoch, optimizer, scheduler
     return model, start_epoch
 
 
 def load_pretrained_ckpt(model, pretrained_ckpt: Path):
-    pretrained_dict = torch.load(pretrained_ckpt)
-    model_dict = model.state_dict()
+    pretrained_state = torch.load(pretrained_ckpt, map_location='cpu')
+    model_state = model.state_dict()
 
-    # Check the model dict keys
-    for (k1, v1), (k2, v2) in zip(pretrained_dict.items(), model_dict.items()):
-        if v1.shape == v2.shape:
-            model_dict[k2] = v1  # Update the pretrained weights to model dict.
+    # def strip_prefixes(key: str) -> str:
+    #     prefixes = ['backbone_modules.', 'resnet_layer.']
+    #     for p in prefixes:
+    #         key = key.split(p)[-1]
+    #     return key
+    #
+    # # Stripped key for model and pretrained model.
+    # model_state_stripped = {}
+    # for k, v in model_state.items():
+    #     model_state_stripped[strip_prefixes(k)] = (k, v)
+    # pretrained_state_stripped = {}
+    # for k, v in pretrained_state.items():
+    #     pretrained_state_stripped[strip_prefixes(k)] = (k, v)
+
+
+    loaded_params = {}
+    num_matched = 0
+    num_shape_mismatch = 0
+    num_unmatched = 0
+
+    for mk, mv in model_state.items():
+        # Skip classification heads by common names
+        if any(h in mk for h in ['fc.weight', 'fc.bias', 'classifier.']):
             continue
-        else:
-            # If k1 contains "fc.weight" or "fc.bias"
-            if "fc.weight" in k1 or "fc.bias" in k1:
-                continue  # Ignore the classification head.
-            else:
-                raise ValueError("Pretrained params and current params do not have the same shape.")
 
-    # Load the pretrained model dict
-    model.load_state_dict(model_dict)
+        smk = strip_prefixes(mk)
+        if smk in pretrained_by_stripped:
+            pk, pv = pretrained_by_stripped[smk]
+            if hasattr(pv, 'shape') and hasattr(mv, 'shape') and pv.shape == mv.shape:
+                loaded_params[mk] = pv
+                num_matched += 1
+            else:
+                num_shape_mismatch += 1
+        else:
+            num_unmatched += 1
+
+    # Update and load
+    model_state.update(loaded_params)
+    missing, unexpected = model.load_state_dict(model_state, strict=False)
+
+    print("=" * 100)
+    print(f"Loaded pretrained weights from {pretrained_ckpt}")
+    print(f"Matched params: {num_matched}")
+    print(f"Shape mismatches: {num_shape_mismatch}")
+    print(f"Unmatched model params (by name): {num_unmatched}")
+    if missing:
+        print(f"Missing keys in loaded state (not filled): {len(missing)}")
+    if unexpected:
+        print(f"Unexpected keys in checkpoint (ignored): {len(unexpected)}")
+    print("=" * 100)
+
     return model
 
 
@@ -165,26 +230,7 @@ def get_latest_ckpt(ckpt_dir: Path):
     return ckpt_files[-1]
 
 
-def save_training_config(args, log_dir: Path):
-    """Save version information and config for reproducibility."""
-    version_info = {
-        'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'model_name': args.model_name,
-        'epochs': args.epochs,
-        'lr': args.lr,
-        'batch_size': getattr(args, 'batch_size', 'N/A'),
-        'resume_version': getattr(args, 'resume_version', None),
-        'expt_name': getattr(args, 'expt_name', None)
-    }
-
-    # Save full config
-    config_file = log_dir / "config.yaml"
-    with open(config_file, 'w') as f:
-        yaml.dump(vars(args), f, default_flow_style=False)
-    print(f"Training config saved to {config_file}.")
-
-
-def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters: int = 1):
+def train(args, train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters: int = 1):
     # Switch mode.
     model.train()
     
@@ -233,7 +279,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
         
         # Print progress every 100 iterations
         if verbose_iters and (batch_idx+1) % verbose_iters == 0:
-            print(f'Epoch [{epoch}][{batch_idx+1}/{total_batches}] '
+            print(f'Epoch [{epoch}/{args.epochs}] [{batch_idx+1}/{total_batches}] '
                   f'Loss: {loss.item():.4f} '
                   f'Top1: {top1_acc:.2f}% '
                   f'Top3: {top3_acc:.2f}% '
@@ -253,7 +299,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
     return global_iter
 
 
-def validate(val_loader, model, criterion, epoch, logger = None, verbose_iters: int = 1):
+def validate(val_loader, model, criterion, epoch, logger = None, verbose: bool = True):
     # Switch mode.
     model.eval()
 
@@ -261,7 +307,7 @@ def validate(val_loader, model, criterion, epoch, logger = None, verbose_iters: 
     running_top1_acc = 0.0
     running_top3_acc = 0.0
     running_top5_acc = 0.0
-    num_batches = len(val_loader)
+    total_samples = 0
 
     for batch_idx, (input, target) in enumerate(val_loader):
         # Forward propagation.
@@ -270,34 +316,34 @@ def validate(val_loader, model, criterion, epoch, logger = None, verbose_iters: 
         with torch.no_grad():
             output = model(input)
             loss = criterion(output, target)
+            num_samples = len(target)
+            total_samples += num_samples
 
             # Metrics.
             topk_acc = topk_accuracy(output, target, topk=(1, 3, 5))
             top1_acc, top3_acc, top5_acc = [acc.item() for acc in topk_acc]
 
             # Update running metrics.
-            running_loss += loss.item()
-            running_top1_acc += top1_acc
-            running_top3_acc += top3_acc
-            running_top5_acc += top5_acc
-
-            # Print progress every several iterations.
-            if verbose_iters and (batch_idx + 1) % verbose_iters == 0:
-                print(f'Val Loss: {loss.item():.4f} '
-                      f'Val Top1: {top1_acc:.2f}% '
-                      f'Val Top3: {top3_acc:.2f}% '
-                      f'Val Top5: {top5_acc:.2f}%')
+            running_loss += loss.item() * num_samples
+            running_top1_acc += top1_acc * num_samples
+            running_top3_acc += top3_acc * num_samples
+            running_top5_acc += top5_acc * num_samples
 
     # Log epoch-level metrics
-    avg_loss = running_loss / num_batches
-    avg_top1_acc = running_top1_acc / num_batches
-    avg_top3_acc = running_top3_acc / num_batches
-    avg_top5_acc = running_top5_acc / num_batches
+    avg_loss = running_loss / total_samples
+    avg_top1_acc = running_top1_acc / total_samples
+    avg_top3_acc = running_top3_acc / total_samples
+    avg_top5_acc = running_top5_acc / total_samples
     if logger:
         logger.add_scalar('Val/Loss', avg_loss, epoch)
         logger.add_scalar('Val/Top1_Accuracy', avg_top1_acc, epoch)
         logger.add_scalar('Val/Top3_Accuracy', avg_top3_acc, epoch)
         logger.add_scalar('Val/Top5_Accuracy', avg_top5_acc, epoch)
+    if verbose:
+        print(f'Val Loss: {avg_loss:.4f} '
+              f'Val Top1: {avg_top1_acc:.2f}% '
+              f'Val Top3: {avg_top3_acc:.2f}% '
+              f'Val Top5: {avg_top5_acc:.2f}%')
     return avg_loss, avg_top1_acc, avg_top3_acc, avg_top5_acc
 
 
@@ -313,10 +359,7 @@ def main(args) -> None:
     # Setup logging.
     logger, log_dir = setup_logging(args)
     
-    # Save training config for resuming.
-    save_training_config(args, log_dir)
-    
-    # Load model.
+    # Create model from model config file.
     if args.model_name in MODEL_NAMES:
         with open(f"./configs/models/{args.model_name}.yaml", "r") as f:
             model_cfg = yaml.safe_load(f)
@@ -336,54 +379,52 @@ def main(args) -> None:
     # Training and validating.
     model, criterion = to_device([model, criterion])
     global_iter = 0
-    best_top1_acc = 0.0
+    best_val_acc = 0.0
 
     # Handle resume training.
-    if args.resume_version:
+    if args.resume_version is not None:
         resume_ckpts_dir = log_dir.parent / f"version_{args.resume_version}" / "ckpts"
         ckpt_path = get_latest_ckpt(resume_ckpts_dir)
         if ckpt_path:
-            optimizer, start_epoch = load_ckpt(ckpt_path, model, optimizer)
+            model, start_epoch, optimizer, scheduler = load_ckpt(ckpt_path, model, optimizer, scheduler)
             global_iter = start_epoch * len(train_loader)  # Resume from the last global_iter
-            print(f"Resuming training from epoch {start_epoch}, best top1 accuracy: {best_top1_acc:.2f}%")
         else:
             print(f"No checkpoint found for resume_version {args.resume_version}. Starting from epoch 1.")
             start_epoch = 1
     else:
         # First time training.
-        if args.pretrained:
-            pretrained_ckpt_path = Path("./pretrained") / f"{args.model_name}_pretrained.pth"
+        if args.pretrained is not None:
+            pretrained_ckpt_path = Path("./pretrained") / f"{args.model_name}_{args.pretrained}.pth"
             model = load_pretrained_ckpt(model, pretrained_ckpt_path)
         start_epoch = 1
 
     # Start training.
     for epoch in range(start_epoch, args.epochs + 1):
-        print(f"\nEpoch {epoch}/{args.epochs}")
-        global_iter = train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters=50)
+        global_iter = train(args, train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters=5)
 
-        if args.validate_epoch:
-            if epoch % args.validate_epoch == 0:
-                # Validate.
-                loss, top1_acc, top3_acc, top5_acc = validate(val_loader, model, criterion, epoch, logger, verbose_iters=10)
+        if (args.validate_epoch is not None) and (epoch % args.validate_epoch == 0):
+            # Validate.
+            loss, top1_acc, top3_acc, top5_acc = validate(val_loader, model, criterion, epoch, logger, verbose=True)
 
-                # Save checkpoint file.
-                model_state = {
-                    "epoch": epoch,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "val_top1_acc": top1_acc,
-                    "val_top3_acc": top3_acc,
-                    "val_top5_acc": top5_acc,
-                }
-                ckpt_file = log_dir / "ckpts" / f"epoch_{epoch}.pth"
-                ckpt_file.parent.mkdir(parents=True, exist_ok=True)
-                if top1_acc > best_top1_acc:
-                    is_best = True
-                    best_top1_acc = top1_acc
-                    print(f"Best epoch at epoch {epoch}, top1_acc: {best_top1_acc:.2f}%")
-                else:
-                    is_best = False
-                save_ckpt(model_state, ckpt_file, is_best=is_best)
+            # Save checkpoint file.
+            ckpt_state = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "val_top1_acc": top1_acc,
+                "val_top3_acc": top3_acc,
+                "val_top5_acc": top5_acc,
+            }
+            ckpt_file = log_dir / "ckpts" / f"epoch_{epoch}.pth"
+            ckpt_file.parent.mkdir(parents=True, exist_ok=True)
+            if top1_acc > best_val_acc:
+                is_best = True
+                best_val_acc = top1_acc
+                print(f"Best epoch at epoch {epoch}, top1_acc: {best_val_acc:.2f}%")
+            else:
+                is_best = False
+            save_ckpt(ckpt_state, ckpt_file, is_best=is_best)
     
     # Close logger
     logger.close()
