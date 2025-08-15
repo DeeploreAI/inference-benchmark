@@ -421,7 +421,7 @@ def main(args) -> None:
             if top1_acc > best_val_acc:
                 is_best = True
                 best_val_acc = top1_acc
-                print(f"Best epoch at epoch {epoch}, top1_acc: {best_val_acc:.2f}%")
+                print(f"Best ckpt at epoch {epoch}, top1_acc: {best_val_acc:.2f}%")
             else:
                 is_best = False
             save_ckpt(ckpt_state, ckpt_file, is_best=is_best)
@@ -431,7 +431,7 @@ def main(args) -> None:
     print("Training completed. Logs saved to:", logger.log_dir)
 
 
-def report_best_val_results(args, best_ckpt: Path):
+def report_best_val_results(args, best_ckpt: Path) -> None:
     # Model.
     with open(f"./configs/models/{args.model_name}.yaml", "r") as f:
         model_cfg = yaml.safe_load(f)
@@ -449,6 +449,7 @@ def report_best_val_results(args, best_ckpt: Path):
     idx_to_class_path = Path(args.root) / "idx_to_class.yaml"
     with open(idx_to_class_path, "r") as f:
         idx_to_class = yaml.safe_load(f)
+    num_cls = len(idx_to_class)
     
     # Initialize per-class counters
     for idx, class_name in idx_to_class.items():
@@ -501,7 +502,9 @@ def report_best_val_results(args, best_ckpt: Path):
     total_top1_correct = 0
     total_top3_correct = 0
     total_top5_correct = 0
-    
+    mean_top1_acc = 0
+    mean_top3_acc = 0
+    mean_top5_acc = 0
     for class_name in sorted(top1_acc_per_cls.keys()):
         total = top1_acc_per_cls[class_name]["total"]
         if total == 0:
@@ -510,6 +513,9 @@ def report_best_val_results(args, best_ckpt: Path):
         top1_acc = (top1_acc_per_cls[class_name]["correct"] / total) * 100
         top3_acc = (top3_acc_per_cls[class_name]["correct"] / total) * 100
         top5_acc = (top5_acc_per_cls[class_name]["correct"] / total) * 100
+        mean_top1_acc += top1_acc
+        mean_top3_acc += top3_acc
+        mean_top5_acc += top5_acc
         
         print(f"{class_name:<25} {top1_acc:>8.2f}% {top3_acc:>8.2f}% {top5_acc:>8.2f}% {total:>8}")
         
@@ -522,9 +528,16 @@ def report_best_val_results(args, best_ckpt: Path):
     overall_top1_acc = (total_top1_correct / total_samples) * 100
     overall_top3_acc = (total_top3_correct / total_samples) * 100
     overall_top5_acc = (total_top5_correct / total_samples) * 100
+
+    # Calculate mean class accuracy.
+    mean_top1_acc = mean_top1_acc / num_cls
+    mean_top3_acc = mean_top3_acc / num_cls
+    mean_top5_acc = mean_top5_acc / num_cls
     
-    print("-" * 80)
+    print("-" * 100)
+    print(f"{'Class Mean':<25} {mean_top1_acc:>8.2f}% {mean_top3_acc:>8.2f}% {mean_top5_acc:>8.2f}% {num_cls:>8}")
     print(f"{'Overall':<25} {overall_top1_acc:>8.2f}% {overall_top3_acc:>8.2f}% {overall_top5_acc:>8.2f}% {total_samples:>8}")
+
     
     # Save detailed results to CSV file
     
@@ -547,7 +560,14 @@ def report_best_val_results(args, best_ckpt: Path):
             'Samples': total
         })
     
-    # Add overall results
+    # Add overall results and class mean results.
+    results_data.append({
+        "Class_Name": "Class Mean",
+        "Top1_Accuracy": round(mean_top1_acc, 2),
+        "Top3_Accuracy": round(mean_top3_acc, 2),
+        "Top5_Accuracy": round(mean_top5_acc, 2),
+        "Samples": num_cls
+    })
     results_data.append({
         'Class_Name': 'Overall',
         'Top1_Accuracy': round(overall_top1_acc, 2),
@@ -562,23 +582,12 @@ def report_best_val_results(args, best_ckpt: Path):
     df.to_csv(csv_file, index=False)
     
     print(f"\nDetailed results saved to: {csv_file}")
-    
-    return {
-        "overall_top1": overall_top1_acc,
-        "overall_top3": overall_top3_acc,
-        "overall_top5": overall_top5_acc,
-        "per_class_results": {
-            "top1": top1_acc_per_cls,
-            "top3": top3_acc_per_cls,
-            "top5": top5_acc_per_cls
-        }
-    }
 
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args)
+    # main(args)
 
     # Report best validation results.
-    # ckpt_path = Path("/home/ziliang/Projects/inference-benchmark/logs/butterflyfishes-resnet101-imagenet/version_0/ckpts/best.pth")
-    # results = report_best_val_results(args, ckpt_path)
+    ckpt_path = Path("/home/ziliang/Projects/inference-benchmark/logs/butterflyfishes-resnet50/version_0/ckpts/best.pth")
+    report_best_val_results(args, ckpt_path)
