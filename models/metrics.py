@@ -1,5 +1,3 @@
-
-
 def topk_accuracy(output, target, topk=(1,)):
     maxk = max(topk)
     batch_size = target.size(0)

@@ -66,7 +66,7 @@ class ConvBN(nn.Module):
         return self.act(self.bn(self.conv(x)))
 
 
-class Bottleneck(nn.Module):
+class BottleneckBlock(nn.Module):
     """Bottleneck block in ResNet."""
 
     def __init__(self, c_in, c_hidden, s, expansion=4):
@@ -100,30 +100,57 @@ class Bottleneck(nn.Module):
         return x_out
 
 
+class BuildingBlock(nn.Module):
+    """Building block in ResNet."""
+
+    def __init__(self, c_in, c_hidden, s, expansion=1):
+        super().__init__()
+        c_out = c_hidden * expansion
+        self.conv_1 = ConvBN(c_in, c_hidden, k=3, s=s)
+        self.conv_2 = ConvBN(c_hidden, c_out, k=3, s=1, act=False)
+        self.act = ReLU()
+
+        # Shortcut connection / skip connection.
+        if c_in == c_hidden and s == 1:
+            self.shortcut = nn.Identity()
+        else:
+            self.shortcut = ConvBN(c_in, c_out, k=1, s=s, act=False)
+
+    def forward(self, x):
+        x_id = x
+        x_out = self.conv_1(x)
+        x_out = self.conv_2(x_out)
+        x_shortcut = self.shortcut(x_id)
+        x_out = self.act(x_out + x_shortcut)
+        return x_out
+
+
 class ResNetLayer(nn.Module):
     """A standard ResNet layer with n Bottleneck blocks."""
 
-    def __init__(self, c_in, c_hidden, n_blocks, downsample=True, expansion=4):
+    def __init__(self, c_in, c_hidden, n_blocks, bottleneck=True, downsample=True, expansion=4):
         """
         Initializes the ResNet layer.
         :param c_in: input channels
         :param c_hidden: hidden channels
         :param n_blocks: number of bottleneck blocks in resnet layer
+        :param bottleneck: whether to use bottleneck block or basic building block
         :param expansion: expansion factor of the output channels to the hidden channels
         :param downsample: whether to downsample the input feature map in the first block
         """
         super().__init__()
         c_out = c_hidden * expansion
 
-        # Handle the first bottleneck block
+        # Handle the first block, could be a downsample block.
         resnet_layer = nn.ModuleList()
+        Block = BottleneckBlock if bottleneck else BuildingBlock
         if downsample:
-            resnet_layer.append(Bottleneck(c_in, c_hidden, s=2, expansion=expansion))
+            resnet_layer.append(Block(c_in, c_hidden, s=2, expansion=expansion))
         else:
-            resnet_layer.append(Bottleneck(c_in, c_hidden, s=1, expansion=expansion))
+            resnet_layer.append(Block(c_in, c_hidden, s=1, expansion=expansion))
 
         # Handle the rest (n_blocks - 1)
-        resnet_layer.extend([Bottleneck(c_out, c_hidden, s=1, expansion=expansion) for _ in range(n_blocks - 1)])
+        resnet_layer.extend([BottleneckBlock(c_out, c_hidden, s=1, expansion=expansion) for _ in range(n_blocks - 1)])
         self.resnet_layer = nn.Sequential(*resnet_layer)
 
     def forward(self, x):

@@ -1,17 +1,17 @@
 augmentation: true
-batch_size: 32
+batch_size: 128
 cfg: ./configs/butterflyfishes.yaml
-epochs: 100
-expt_name: null
+epochs: 200
+expt_name: butterflyfishes-resnet101-imagenet
 lr: 0.001
-model_name: resnet50
+model_name: resnet101
 num_cls: 28
 num_devices: 1
 num_workers: 8
 optimizer: AdamW
 pin_memory: true
-pretrained: imagenet-1k
-resume_version: null
+pretrained: true
+resume_version: 0
 root: /home/ziliang/Projects/Marine Datasets/butterflyfishes_cls
 shuffle: true
 validate_epoch: 5

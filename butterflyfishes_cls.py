@@ -4,6 +4,7 @@ from typing import Optional, List
 import yaml
 import shutil
 from pathlib import Path
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -16,7 +17,7 @@ from datasets.dataloader import data_loader
 from models.metrics import topk_accuracy
 
 
-MODEL_NAMES = ["resnet50", "resnet101", "vgg16", "vgg19"]
+MODEL_NAMES = ["resnet18", "resnet34", "resnet50", "resnet101", "vgg16", "vgg19"]
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -109,14 +110,14 @@ def save_ckpt(model_state, ckpt_path: Path, is_best=False):
         shutil.copyfile(ckpt_path, ckpt_path.parent / "best.pth")
 
 
-def load_ckpt(ckpt_path: Path, model, optimizer):
+def load_ckpt(ckpt_path: Path, model, optimizer = None):
     if not ckpt_path.exists():
         print(f"Checkpoint file {ckpt_path} not found!")
         return None, 0
 
-    print("=" * 60)
-    print(f"\nResume Training from {ckpt_path}\n")
     checkpoint = torch.load(ckpt_path, map_location='cpu')
+    start_epoch = checkpoint.get('epoch', 0)
+    print(f"\nUse epoch {start_epoch} checkpoint from {ckpt_path}.\n")
     
     # Load model state dict.
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -124,10 +125,9 @@ def load_ckpt(ckpt_path: Path, model, optimizer):
     # Load optimizer state if provided.
     if optimizer and "optimizer_state_dict" in checkpoint:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    
-    # Get training info
-    start_epoch = checkpoint.get('epoch', 0)
-    return optimizer, start_epoch
+        return model, optimizer, start_epoch
+
+    return model, start_epoch
 
 
 def load_pretrained_ckpt(model, pretrained_ckpt: Path):
@@ -135,23 +135,16 @@ def load_pretrained_ckpt(model, pretrained_ckpt: Path):
     model_dict = model.state_dict()
 
     # Check the model dict keys
-    for v1, v2 in zip(pretrained_dict.values(), model_dict.values()):
+    for (k1, v1), (k2, v2) in zip(pretrained_dict.items(), model_dict.items()):
         if v1.shape == v2.shape:
+            model_dict[k2] = v1  # Update the pretrained weights to model dict.
             continue
         else:
-            raise ValueError("Pretrained params and current params do not have the same shape.")
-        # param_name = k_1.split('.')[-1]
-        # if "conv" in k_1.lower():
-        #     layer_name = "conv"
-        # elif "bn" in k_1.lower():
-        #     layer_name = "bn"
-        # elif
-
-    # Rename the pretrained dict keys
-    pretrained_dict = {k2: v1 for k2, v1 in zip(model_dict.keys(), pretrained_dict.values())}
-
-    # Overwrite model dict
-    model_dict.update(pretrained_dict)
+            # If k1 contains "fc.weight" or "fc.bias"
+            if "fc.weight" in k1 or "fc.bias" in k1:
+                continue  # Ignore the classification head.
+            else:
+                raise ValueError("Pretrained params and current params do not have the same shape.")
 
     # Load the pretrained model dict
     model.load_state_dict(model_dict)
@@ -191,7 +184,7 @@ def save_training_config(args, log_dir: Path):
     print(f"Training config saved to {config_file}.")
 
 
-def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters: int = 50):
+def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, global_iter, verbose_iters: int = 1):
     # Switch mode.
     model.train()
     
@@ -199,14 +192,18 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
     running_top1_acc = 0.0
     running_top3_acc = 0.0
     running_top5_acc = 0.0
-    num_batches = len(train_loader)
-
+    total_samples = 0
+    total_batches = len(train_loader)
     for batch_idx, (input, target) in enumerate(train_loader):
         # Forward propagation.
         input = input.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
         output = model(input)
         loss = criterion(output, target)
+
+        # Number of samples.
+        num_samples = len(target)
+        total_samples += num_samples
 
         # Metrics.
         topk_acc = topk_accuracy(output, target, topk=(1, 3, 5))
@@ -219,10 +216,10 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
         scheduler.step()
         
         # Update running metrics
-        running_loss += loss.item()
-        running_top1_acc += top1_acc
-        running_top3_acc += top3_acc
-        running_top5_acc += top5_acc
+        running_loss += loss.item() * num_samples
+        running_top1_acc += top1_acc * num_samples
+        running_top3_acc += top3_acc * num_samples
+        running_top5_acc += top5_acc * num_samples
         
         # Log metrics for each iteration
         current_lr = optimizer.param_groups[0]['lr']
@@ -236,7 +233,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
         
         # Print progress every 100 iterations
         if verbose_iters and (batch_idx+1) % verbose_iters == 0:
-            print(f'Epoch [{epoch}][{batch_idx+1}/{num_batches}] '
+            print(f'Epoch [{epoch}][{batch_idx+1}/{total_batches}] '
                   f'Loss: {loss.item():.4f} '
                   f'Top1: {top1_acc:.2f}% '
                   f'Top3: {top3_acc:.2f}% '
@@ -244,10 +241,10 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
                   f'LR: {current_lr:.6f}')
     
     # Log epoch-level metrics
-    avg_loss = running_loss / num_batches
-    avg_top1_acc = running_top1_acc / num_batches
-    avg_top3_acc = running_top3_acc / num_batches
-    avg_top5_acc = running_top5_acc / num_batches
+    avg_loss = running_loss / total_samples
+    avg_top1_acc = running_top1_acc / total_samples
+    avg_top3_acc = running_top3_acc / total_samples
+    avg_top5_acc = running_top5_acc / total_samples
     logger.add_scalar('Epoch/Train_Loss', avg_loss, epoch)
     logger.add_scalar('Epoch/Train_Top1_Accuracy', avg_top1_acc, epoch)
     logger.add_scalar('Epoch/Train_Top3_Accuracy', avg_top3_acc, epoch)
@@ -256,7 +253,7 @@ def train(train_loader, model, criterion, optimizer, scheduler, epoch, logger, g
     return global_iter
 
 
-def validate(val_loader, model, criterion, epoch, logger, verbose_iters: int = 10):
+def validate(val_loader, model, criterion, epoch, logger = None, verbose_iters: int = 1):
     # Switch mode.
     model.eval()
 
@@ -296,10 +293,11 @@ def validate(val_loader, model, criterion, epoch, logger, verbose_iters: int = 1
     avg_top1_acc = running_top1_acc / num_batches
     avg_top3_acc = running_top3_acc / num_batches
     avg_top5_acc = running_top5_acc / num_batches
-    logger.add_scalar('Val/Loss', avg_loss, epoch)
-    logger.add_scalar('Val/Top1_Accuracy', avg_top1_acc, epoch)
-    logger.add_scalar('Val/Top3_Accuracy', avg_top3_acc, epoch)
-    logger.add_scalar('Val/Top5_Accuracy', avg_top5_acc, epoch)
+    if logger:
+        logger.add_scalar('Val/Loss', avg_loss, epoch)
+        logger.add_scalar('Val/Top1_Accuracy', avg_top1_acc, epoch)
+        logger.add_scalar('Val/Top3_Accuracy', avg_top3_acc, epoch)
+        logger.add_scalar('Val/Top5_Accuracy', avg_top5_acc, epoch)
     return avg_loss, avg_top1_acc, avg_top3_acc, avg_top5_acc
 
 
@@ -392,6 +390,154 @@ def main(args) -> None:
     print("Training completed. Logs saved to:", logger.log_dir)
 
 
+def report_best_val_results(args, best_ckpt: Path):
+    # Model.
+    with open(f"./configs/models/{args.model_name}.yaml", "r") as f:
+        model_cfg = yaml.safe_load(f)
+    model = Model(model_cfg)
+
+    # Load best checkpoint.
+    model, epoch = load_ckpt(best_ckpt, model)
+    model = model.cuda()
+
+    # Load validation dataset.
+    _, val_loader = data_loader(args)
+
+    # Create per class metrics.
+    top1_acc_per_cls, top3_acc_per_cls, top5_acc_per_cls = {}, {}, {}
+    idx_to_class_path = Path(args.root) / "idx_to_class.yaml"
+    with open(idx_to_class_path, "r") as f:
+        idx_to_class = yaml.safe_load(f)
+    
+    # Initialize per-class counters
+    for idx, class_name in idx_to_class.items():
+        top1_acc_per_cls[class_name] = {"correct": 0, "total": 0}
+        top3_acc_per_cls[class_name] = {"correct": 0, "total": 0}
+        top5_acc_per_cls[class_name] = {"correct": 0, "total": 0}
+
+    # Validate.
+    model.eval()
+    for batch_idx, (input, target) in enumerate(val_loader):
+        # Forward propagation.
+        input = input.cuda(non_blocking=True)
+        target = target.cuda(non_blocking=True)
+        with torch.no_grad():
+            output = model(input)
+
+            # Get predictions for top-1, top-3, top-5
+            _, pred_top1 = output.topk(1, 1, largest=True, sorted=True)
+            _, pred_top3 = output.topk(3, 1, largest=True, sorted=True)
+            _, pred_top5 = output.topk(5, 1, largest=True, sorted=True)
+            
+            # Calculate per-class accuracy
+            for i in range(target.size(0)):
+                gt_class_idx = target[i].item()
+                gt_class_name = idx_to_class[gt_class_idx]
+                
+                # Update total count for this class
+                top1_acc_per_cls[gt_class_name]["total"] += 1
+                top3_acc_per_cls[gt_class_name]["total"] += 1
+                top5_acc_per_cls[gt_class_name]["total"] += 1
+                
+                # Check if prediction is correct for top-1
+                if gt_class_idx == pred_top1[i, 0].item():
+                    top1_acc_per_cls[gt_class_name]["correct"] += 1
+                
+                # Check if prediction is correct for top-3
+                if gt_class_idx in pred_top3[i].tolist():
+                    top3_acc_per_cls[gt_class_name]["correct"] += 1
+                
+                # Check if prediction is correct for top-5
+                if gt_class_idx in pred_top5[i].tolist():
+                    top5_acc_per_cls[gt_class_name]["correct"] += 1
+
+    # Calculate final per-class accuracy percentages
+    print("\n=== Per-Class Validation Results ===")
+    print(f"{'Class Name':<25} {'Top-1 Acc':<12} {'Top-3 Acc':<12} {'Top-5 Acc':<12} {'Samples':<10}")
+    print("-" * 100)
+    
+    total_samples = 0
+    total_top1_correct = 0
+    total_top3_correct = 0
+    total_top5_correct = 0
+    
+    for class_name in sorted(top1_acc_per_cls.keys()):
+        total = top1_acc_per_cls[class_name]["total"]
+        if total == 0:
+            continue
+            
+        top1_acc = (top1_acc_per_cls[class_name]["correct"] / total) * 100
+        top3_acc = (top3_acc_per_cls[class_name]["correct"] / total) * 100
+        top5_acc = (top5_acc_per_cls[class_name]["correct"] / total) * 100
+        
+        print(f"{class_name:<25} {top1_acc:>8.2f}% {top3_acc:>8.2f}% {top5_acc:>8.2f}% {total:>8}")
+        
+        total_samples += total
+        total_top1_correct += top1_acc_per_cls[class_name]["correct"]
+        total_top3_correct += top3_acc_per_cls[class_name]["correct"]
+        total_top5_correct += top5_acc_per_cls[class_name]["correct"]
+    
+    # Calculate overall accuracy
+    overall_top1_acc = (total_top1_correct / total_samples) * 100
+    overall_top3_acc = (total_top3_correct / total_samples) * 100
+    overall_top5_acc = (total_top5_correct / total_samples) * 100
+    
+    print("-" * 80)
+    print(f"{'Overall':<25} {overall_top1_acc:>8.2f}% {overall_top3_acc:>8.2f}% {overall_top5_acc:>8.2f}% {total_samples:>8}")
+    
+    # Save detailed results to CSV file
+    
+    # Create DataFrame for per-class results
+    results_data = []
+    for class_name in sorted(top1_acc_per_cls.keys()):
+        total = top1_acc_per_cls[class_name]["total"]
+        if total == 0:
+            continue
+            
+        top1_acc = (top1_acc_per_cls[class_name]["correct"] / total) * 100
+        top3_acc = (top3_acc_per_cls[class_name]["correct"] / total) * 100
+        top5_acc = (top5_acc_per_cls[class_name]["correct"] / total) * 100
+        
+        results_data.append({
+            'Class_Name': class_name,
+            'Top1_Accuracy': round(top1_acc, 2),
+            'Top3_Accuracy': round(top3_acc, 2),
+            'Top5_Accuracy': round(top5_acc, 2),
+            'Samples': total
+        })
+    
+    # Add overall results
+    results_data.append({
+        'Class_Name': 'Overall',
+        'Top1_Accuracy': round(overall_top1_acc, 2),
+        'Top3_Accuracy': round(overall_top3_acc, 2),
+        'Top5_Accuracy': round(overall_top5_acc, 2),
+        'Samples': total_samples
+    })
+    
+    # Create DataFrame and save to CSV
+    df = pd.DataFrame(results_data)
+    csv_file = best_ckpt.parent.parent / "per_class_results.csv"
+    df.to_csv(csv_file, index=False)
+    
+    print(f"\nDetailed results saved to: {csv_file}")
+    
+    return {
+        "overall_top1": overall_top1_acc,
+        "overall_top3": overall_top3_acc,
+        "overall_top5": overall_top5_acc,
+        "per_class_results": {
+            "top1": top1_acc_per_cls,
+            "top3": top3_acc_per_cls,
+            "top5": top5_acc_per_cls
+        }
+    }
+
+
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
+    # Report best validation results.
+    # ckpt_path = Path("/home/ziliang/Projects/inference-benchmark/logs/butterflyfishes-resnet101-imagenet/version_0/ckpts/best.pth")
+    # results = report_best_val_results(args, ckpt_path)

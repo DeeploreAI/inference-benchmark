@@ -1,0 +1,30 @@
+Class_Name,Top1_Accuracy,Top3_Accuracy,Top5_Accuracy,Samples
+atoll butterflyfish,91.49,95.74,95.74,47
+black-backed butterflyfish,98.0,100.0,100.0,50
+crosshatch butterflyfish,92.11,100.0,100.0,38
+fourspot butterflyfish,90.2,94.12,96.08,51
+highfin coralfish,95.92,97.96,100.0,49
+humphead bannerfish,91.84,95.92,97.96,49
+indian redfin butterflyfish,90.57,94.34,100.0,53
+indian vagabond butterflyfish,91.53,93.22,94.92,59
+lined butterflyfish,98.0,100.0,100.0,50
+long-beaked coralfish,95.92,100.0,100.0,49
+longfin bannerfish,90.38,98.08,98.08,52
+margined coralfish,92.59,100.0,100.0,27
+masked bannerfish,96.08,100.0,100.0,51
+ocellated coralfish,89.47,97.37,100.0,38
+oval-spot butterflyfish,97.83,97.83,100.0,46
+pacific double-saddle butterflyfish,92.16,92.16,96.08,51
+panda butterflyfish,91.11,91.11,91.11,45
+pennant bannerfish,81.25,89.58,91.67,48
+phantom bannerfish,94.0,98.0,98.0,50
+redfin butterflyfish,93.88,97.96,97.96,49
+saddleback butterflyfish,92.16,98.04,98.04,51
+speckled butterflyfish,93.88,93.88,97.96,49
+teardrop butterflyfish,97.92,100.0,100.0,48
+threadfin butterflyfish,87.27,96.36,100.0,55
+triangular butterflyfish,94.12,98.04,100.0,51
+two-eyed coralfish,97.37,100.0,100.0,38
+vagabond butterflyfish,90.0,96.0,100.0,50
+yellow-dotted butterflyfish,88.24,88.24,100.0,17
+Overall,92.75,96.64,98.25,1311

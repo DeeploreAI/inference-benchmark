@@ -28,6 +28,12 @@ def data_loader(args):
             normalize
         ])
         train_set = datasets.ImageFolder(train_dir, aug_transforms)
+
+        # Save index to class dictionary.
+        # import yaml
+        # idx_to_cls_dict = {v: k for k, v in train_set.class_to_idx.items()}
+        # with open("/home/ziliang/Projects/Marine Datasets/butterflyfishes_cls/idx_to_class.yaml", "w") as f:
+        #     yaml.dump(idx_to_cls_dict, f, indent=4)
     else:
         train_set = datasets.ImageFolder(train_dir, basic_transforms)
     val_set = datasets.ImageFolder(val_dir, basic_transforms)
@@ -39,13 +45,15 @@ def data_loader(args):
         shuffle=args.shuffle,
         num_workers=args.num_workers,
         pin_memory=args.pin_memory,
-        sampler=None
+        sampler=None,
+        drop_last=False
     )
     val_loader = torch.utils.data.DataLoader(
         val_set,
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=args.pin_memory
+        pin_memory=args.pin_memory,
+        drop_last=False
     )
     return train_loader, val_loader

@@ -14,7 +14,7 @@ MODULE_MAP = {
     'Linear': Linear,
     'Conv': Conv,
     'ConvBN': ConvBN,
-    'Bottleneck': Bottleneck,
+    'Bottleneck': BottleneckBlock,
     'ResNetLayer': ResNetLayer,
     'VggBlock': VggBlock,
     'AvgPool': AvgPool,
