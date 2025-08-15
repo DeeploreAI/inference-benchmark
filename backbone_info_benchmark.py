@@ -1,10 +1,9 @@
-# Basic lib
 import json
 import os
 import time
 import yaml
+from pathlib import Path
 
-# DL lib
 import numpy as np
 from PIL import Image
 import torch
@@ -13,37 +12,29 @@ from torchinfo import summary
 import torchvision.transforms as transforms
 import torchvision.models as models
 
-# Local lib
 from models.utils import Model
 from models.utils import set_deterministic
+from butterflyfishes_cls import load_pretrained_ckpt
 
 
-def load_pretrained_weights(model, pretrained_weight_path):
-    pretrained_dict = torch.load(pretrained_weight_path)
-    model_dict = model.state_dict()
+MODEL_MAP = {
+    "resnet18": models.resnet18,
+    "resnet34": models.resnet34,
+    "resnet50": models.resnet50,
+    "resnet101": models.resnet101,
+}
 
-    # Check the model dict keys
-    for v1, v2 in zip(pretrained_dict.values(), model_dict.values()):
-        if v1.shape == v2.shape:
-            continue
-        else:
-            raise ValueError("Pretrained params and current params do not have the same shape.")
-        # param_name = k_1.split('.')[-1]
-        # if "conv" in k_1.lower():
-        #     layer_name = "conv"
-        # elif "bn" in k_1.lower():
-        #     layer_name = "bn"
-        # elif
 
-    # Rename the pretrained dict keys
-    pretrained_dict = {k2: v1 for k2, v1 in zip(model_dict.keys(), pretrained_dict.values())}
-
-    # Overwrite model dict
-    model_dict.update(pretrained_dict)
-
-    # Load the pretrained model dict
-    model.load_state_dict(model_dict)
-    return model
+def download_pretrained_ckpts(pretrained_folder: Path) -> None:
+    pretrained_folder.mkdir(parents=True, exist_ok=True)
+    for model_name in MODEL_MAP.keys():
+        try:
+            # Try downloading ImageNet-1K-V2 weights.
+            weights = "IMAGENET1K_V2"
+            model = MODEL_MAP[model_name](weights=weights)
+        except KeyError:
+            weights = "IMAGENET1K_V1"
+            model = MODEL_MAP[model_name](weights=weights)
 
 
 def image_preprocess(image_path):
@@ -169,17 +160,16 @@ def main():
     imagenet_classes_name = [imagenet_classes[f"{i}"][1] for i in range(len(imagenet_classes))]
 
     # Models
-    model_names_list = ["resnet50", "resnet101", "vgg16", "vgg19"]
-    for model_name in model_names_list:
+    for model_name in MODEL_MAP.keys():
         print(f"\n=== Testing {model_name} ===")
-        model_cfg_path = os.path.join("configs", f"{model_name}.yaml")
+        model_cfg_path = os.path.join("./configs/models", f"{model_name}.yaml")
         with open(model_cfg_path, 'r', encoding='utf-8') as f:
             model_cfg = yaml.safe_load(f)
         model = Model(model_cfg)
 
         # Load pretrained weights
-        pretrained_weight_path = os.path.join("pretrained", f"{model_name}_pretrained.pth")
-        model = load_pretrained_weights(model, pretrained_weight_path)
+        pretrained_weight_path = Path("pretrained", f"{model_name}_pretrained.pth")
+        model = load_pretrained_ckpt(model, pretrained_weight_path)
 
         # Model summary
         model_summary = summary(model, input_size=image_tensor.shape, depth=3, verbose=1)
@@ -196,11 +186,11 @@ def main():
             f.write("\n")
             f.write("Device: GPU (RTX-4090)\n")
             f.write("Framework: PyTorch\n")
-            f.write("="*60)
+            f.write("=" * 100)
             f.write("\nClassification Test\n")
             for key, value in classify_results.items():
                 f.write(f"{key}: {value}\n")
-            f.write("=" * 60)
+            f.write("=" * 100)
             f.write("\nInference Time Test\n")
             for key, value in time_test_results.items():
                 f.write(f"{key}: {value:.4f}\n")
@@ -208,4 +198,9 @@ def main():
 
 if __name__ == "__main__":
     set_deterministic(random_seed=666)
-    main()
+
+    # Download pretrained ckpts.
+    pretrained_ckpts_folder = Path("./pretrained")
+    download_pretrained_ckpts(pretrained_ckpts_folder)
+
+    # main()

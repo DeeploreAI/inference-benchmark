@@ -30,7 +30,7 @@ This is a deep learning inference benchmark repository that compares performance
 ### Basic Benchmarking
 ```bash
 # Run PyTorch GPU benchmark for all models
-python pytorch_gpu_benchmark.py
+python backbone_info_benchmark.py
 
 # Run ONNX Runtime GPU benchmark for all models  
 python onnx_gpu_benchmark.py

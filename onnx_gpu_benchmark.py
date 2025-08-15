@@ -3,20 +3,21 @@ import json
 import os
 import time
 import yaml
+from pathlib import Path
 
 # DL lib
+import onnx
+import onnxruntime
 import numpy as np
 from PIL import Image
 import torch
 import torch.onnx
 
-import onnx
-import onnxruntime
-
 # Local lib
 from models.utils import Model
 from models.utils import set_deterministic
-from pytorch_gpu_benchmark import load_pretrained_weights, image_preprocess
+from butterflyfishes_cls import load_pretrained_ckpt
+from backbone_info_benchmark import image_preprocess
 
 
 def onnx_inference_time_test(ort_session, ort_inputs, num_warmup_iters=10, num_iters=100):
@@ -118,8 +119,8 @@ def main():
         model = Model(model_cfg)
 
         # Load pretrained weights
-        pretrained_weight_path = os.path.join("pretrained", f"{model_name}_pretrained.pth")
-        model = load_pretrained_weights(model, pretrained_weight_path)
+        pretrained_weight_path = Path("pretrained", f"{model_name}_pretrained.pth")
+        model = load_pretrained_ckpt(model, pretrained_weight_path)
 
         # Export ONNX model
         with torch.no_grad():
