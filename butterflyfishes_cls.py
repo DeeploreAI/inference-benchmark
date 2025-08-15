@@ -586,8 +586,8 @@ def report_best_val_results(args, best_ckpt: Path) -> None:
 
 if __name__ == "__main__":
     args = parse_args()
-    # main(args)
+    main(args)
 
     # Report best validation results.
-    ckpt_path = Path("/home/ziliang/Projects/inference-benchmark/logs/butterflyfishes-resnet50/version_0/ckpts/best.pth")
-    report_best_val_results(args, ckpt_path)
+    # ckpt_path = Path("/home/ziliang/Projects/inference-benchmark/logs/butterflyfishes-resnet18/version_0/ckpts/best.pth")
+    # report_best_val_results(args, ckpt_path)

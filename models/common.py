@@ -105,13 +105,14 @@ class BuildingBlock(nn.Module):
 
     def __init__(self, c_in, c_hidden, s, expansion=1):
         super().__init__()
-        c_out = c_hidden * expansion
+        # Do not use the expansion parameters.
+        c_out = c_hidden
         self.conv_1 = ConvBN(c_in, c_hidden, k=3, s=s)
         self.conv_2 = ConvBN(c_hidden, c_out, k=3, s=1, act=False)
         self.act = ReLU()
 
         # Shortcut connection / skip connection.
-        if c_in == c_hidden and s == 1:
+        if c_in == c_out and s == 1:
             self.shortcut = nn.Identity()
         else:
             self.shortcut = ConvBN(c_in, c_out, k=1, s=s, act=False)
@@ -150,7 +151,7 @@ class ResNetLayer(nn.Module):
             resnet_layer.append(Block(c_in, c_hidden, s=1, expansion=expansion))
 
         # Handle the rest (n_blocks - 1)
-        resnet_layer.extend([BottleneckBlock(c_out, c_hidden, s=1, expansion=expansion) for _ in range(n_blocks - 1)])
+        resnet_layer.extend([Block(c_out, c_hidden, s=1, expansion=expansion) for _ in range(n_blocks - 1)])
         self.resnet_layer = nn.Sequential(*resnet_layer)
 
     def forward(self, x):

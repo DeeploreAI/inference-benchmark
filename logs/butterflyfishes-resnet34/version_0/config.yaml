@@ -2,9 +2,9 @@ augmentation: true
 batch_size: 128
 cfg: ./configs/butterflyfishes.yaml
 epochs: 100
-expt_name: butterflyfishes-resnet50
+expt_name: butterflyfishes-resnet34
 lr: 0.001
-model_name: resnet50
+model_name: resnet34
 num_cls: 28
 num_devices: 1
 num_workers: 8

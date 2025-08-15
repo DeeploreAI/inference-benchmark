@@ -3,16 +3,16 @@
   # Conv: [c_in, c_out, k, s, act, bias]
   # Linear: [c_in, c_out, act, bias]
   # Pool: [glb, k, s]
-  # ResNetLayer: [c_in, c_hidden, n_blocks, bottleneck, downsample]
+  # ResNetLayer: [c_in, c_hidden, n_blocks, bottleneck, downsample, expansion]
   # VggBlock: [c_in, c_out, n_layers, k, s]
 backbone:
   [
     [1, ConvBN, [3, 64, 7, 2]],
     [1, MaxPool, [False, 3, 2]],
-    [1, ResNetLayer, [64, 64, 2, False, False]],
-    [1, ResNetLayer, [128, 128, 2, False, True]],
-    [1, ResNetLayer, [256, 256, 2, False, True]],
-    [1, ResNetLayer, [512, 512, 2, False, True]],
+    [1, ResNetLayer, [64, 64, 2, False, False, 1]],
+    [1, ResNetLayer, [64, 128, 2, False, True, 1]],
+    [1, ResNetLayer, [128, 256, 2, False, True, 1]],
+    [1, ResNetLayer, [256, 512, 2, False, True, 1]],
   ]
 head:
   [
